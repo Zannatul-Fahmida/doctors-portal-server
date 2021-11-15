@@ -6,6 +6,8 @@ const admin = require("firebase-admin");
 const ObjectId = require('mongodb').ObjectId;
 require('dotenv').config();
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET);
+
 const port = process.env.PORT || 5000;
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -21,13 +23,13 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
 
 async function verifyToken(req, res, next) {
-  if(req.headers?.authorization?.startsWith('Bearer ')){
+  if (req.headers?.authorization?.startsWith('Bearer ')) {
     const token = req.headers.authorization.split(' ')[1];
-    try{
+    try {
       const decodedUser = await admin.auth().verifyIdToken(token);
       req.decodedEmail = decodedUser.email;
     }
-    catch{
+    catch {
 
     }
   }
@@ -58,7 +60,7 @@ async function run() {
 
     app.get('/appointments/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id : ObjectId(id)};
+      const query = { _id: ObjectId(id) };
       const result = await appointmentsCollection.findOne(query);
       res.json(result)
     })
@@ -92,18 +94,29 @@ async function run() {
     app.put('/users/admin', verifyToken, async (req, res) => {
       const user = req.body;
       const requester = req.decodedEmail;
-      if(requester){
-        const requesterAccount = await usersCollection.findOne({email: requester});
-        if(requesterAccount.role === 'admin'){
+      if (requester) {
+        const requesterAccount = await usersCollection.findOne({ email: requester });
+        if (requesterAccount.role === 'admin') {
           const filter = { email: user.email };
           const updateDoc = { $set: { role: 'admin' } };
           const result = await usersCollection.updateOne(filter, updateDoc);
           res.json(result);
         }
       }
-      else{
-        res.status(403).json({message: 'You do not have access to make admin'});
+      else {
+        res.status(403).json({ message: 'You do not have access to make admin' });
       }
+    })
+
+    app.post('/create-payment-intent', async (req, res) => {
+      const paymentInfo = req.body;
+      const amount = paymentInfo.price * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ['card'],
+      });
+      res.json({ clientSecret: paymentIntent.client_secret })
     })
 
   }
