@@ -125,12 +125,12 @@ async function run() {
       const paymentInfo = req.body;
       const amount = paymentInfo.price * 100;
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: "usd",
-        payment_method_types: ['card'],
+          currency: 'usd',
+          amount: amount,
+          payment_method_types: ['card']
       });
       res.json({ clientSecret: paymentIntent.client_secret })
-    })
+  })
 
   }
   finally {
